@@ -1,6 +1,8 @@
+import pandas as pd
 import requests #for Python to communicate with websites.
 from bs4 import BeautifulSoup #for Python to read and extract information from HTML
 
+#web scrapping
 URL = "https://books.toscrape.com/"
 
 headers = { #provides information about the type of browser making the request.
@@ -9,7 +11,6 @@ headers = { #provides information about the type of browser making the request.
 
 response = requests.get(URL, headers=headers, timeout=10)
 #requests.get - tells Python to visit the website and gets the html
-
 
 #print(response.status_code)
 
@@ -25,41 +26,50 @@ for book in books[:10]:
     #Take the first 10 books 
     title = book.h3.a["title"] 
     #extracts the book title.
-    price = book.find("p", class_="price_color").text 
+    price_text= book.find("p", class_="price_color").text 
         #extracts the price.
-    price = price.replace("£", "")#replace the euro with nothing so i can convert to int 
-    price = float(price)
+    #replace the euro with nothing so i can convert to int 
+    price_gbp = float(
+        price_text.replace("£", ""))
     #print(type(price))
     #print(type(title)) #for both to confirm data type is okay
     #print(title, price, end="\n\n")   # i wanted a new line btwn each book
     book_list.append({
         "Book Title": title,
-        "Price (GBP)": price
+        "Price (GBP)": price_gbp
     })
     #print(book_list)# turned to a list so i can make changes etc like adding other books..must be inside the loop to ensure that all books are added
+print("\n--- Currency Conversion ---")
 currency_converter = input("Enter the currency to convert to (KES, USD, EUR): ").upper()
-url = "https://console.fastforex.io/currencies/listing.json?key=f4ff6419e9-46aaa81474-tnx2jc/latest/GBP"
-response = requests.get(url)
-print(f"Server replied with: {response.status_code}")
-#print(response.text)
 
+if currency_converter not in ["KES", "USD", "EUR"]:
+    print("Invalid currency selected.")
 
-#df = pd.DataFrame(book_list) #data frame creates a table 
-#df.index = df.index + 1 # to have it start at one, instead of 0 , to note this does not change how python njumbers
-#print(df)
-#df.to_csv("books_prices.csv", index = False)
-#print(df) # on csv file the index column is not there but appears here
+else:
+    api_url = "https://v6.exchangerate-api.com/v6/39b91c0d70a8e0f4284892fa/latest/GBP"
 
-#df.to_csv("books_prices.csv", index = True)
-#print(df)# the index c appears on csv file, not recommneded 
+api_response = requests.get(api_url)
 
-#df.to_csv("books_prices.csv") 
-#print(df)
+print("Status code:", api_response.status_code)
 
-#make sure to close excel so you dont get permision denied.
+api_response.raise_for_status()
 
+currency_data = api_response.json()
 
+exchange_rate = currency_data["conversion_rates"][currency_converter]
+print("Exchange rate:", exchange_rate)
 
-   
+for book in book_list:
+    converted_price = book["Price (GBP)"] * exchange_rate
 
+    book[f"Price ({currency_converter})"] = round(converted_price, 2)
+print(book["Book Title"], converted_price)    
 
+df = pd.DataFrame(book_list)
+
+print("\n--- Converted Book Prices ---")
+print(df)
+
+df.to_csv("converted_book_prices.csv", index=False)
+
+  
